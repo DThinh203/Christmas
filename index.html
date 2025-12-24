@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+   <title>Giáng Sinh Ngôi Sao Lấp Lánh - Fast Burst</title>
+   <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playball&display=swap" rel="stylesheet">
+   
+   <style>
+       body, html {
+           margin: 0; padding: 0; width: 100%; height: 100%;
+           overflow: hidden; background-color: #050505;
+           font-family: 'Arial', sans-serif;
+           touch-action: none;
+       }
+
+       #canvas-container {
+           position: absolute; top: 0; left: 0;
+           width: 100%; height: 100%; z-index: 0;
+       }
+
+       .content {
+           position: absolute; bottom: 30px; left: 0; width: 100%;
+           text-align: center; z-index: 2; pointer-events: none;
+           padding-bottom: 20px;
+       }
+
+       h1 {
+           font-family: 'Great Vibes', cursive; font-size: 5.5rem; margin: 0;
+           line-height: 1.2; color: #f94e4e;
+           text-shadow: 0 0 10px #f94e4e, 2px 2px 2px #000;
+           animation: textFadeIn 4s ease-out forwards; opacity: 0;
+       }
+
+       p {
+           font-family: 'Playball', cursive; font-size: 2rem; margin-top: 5px;
+           color: #fff; text-shadow: 0 0 5px #fff;
+           animation: textFadeIn 5s ease-out forwards; opacity: 0;
+       }
+
+       .custom-name {
+           color: #FFD700;
+           font-size: 2.5rem;
+           font-weight: bold;
+           text-shadow: 0 0 10px #FFD700, 0 0 20px #FFA500;
+       }
+
+       .guide-text {
+           position: absolute; top: 10px; width: 100%; text-align: center;
+           color: rgba(255, 255, 255, 0.2); font-family: sans-serif;
+           font-size: 0.8rem; pointer-events: none; z-index: 10;
+       }
+
+       @keyframes textFadeIn {
+           from { opacity: 0; transform: translateY(20px); }
+           to { opacity: 1; transform: translateY(0); }
+       }
+
+       @media (max-width: 768px) {
+           h1 { font-size: 3.5rem; }
+           p { font-size: 1.2rem; }
+           .content { bottom: 50px; }
+       }
+   </style>
+</head>
+<body>
+
+   <canvas id="canvas-container"></canvas>
+   
+   <div class="content">
+       <h1>Merry Christmas</h1>
+       <p id="greeting-text"> Chúc Bạn Giáng Sinh An Lành</p>
+   </div>
+
+   <script>
+       // Đọc URL parameter để thay đổi tên
+       const urlParams = new URLSearchParams(window.location.search);
+       const customName = urlParams.get('name');
+
+       if (customName) {
+           const greetingElement = document.getElementById('greeting-text');
+           greetingElement.innerHTML = `Chúc <span class="custom-name">${customName}</span> Giáng Sinh An Lành`;
+       }
+   </script>
+
+   <script>
+       const canvas = document.getElementById('canvas-container');
+       const ctx = canvas.getContext('2d');
+
+       let width, height;
+       let particles = [];
+       let treeTargetPoints = [];
+
+       let mouse = { x: 0, y: 0, isDown: false };
+
+       function handleStart(x, y) { mouse.isDown = true; mouse.x = x; mouse.y = y; }
+       function handleMove(x, y) { if(mouse.isDown) { mouse.x = x; mouse.y = y; } }
+       function handleEnd() { mouse.isDown = false; }
+
+       canvas.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+       window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+       window.addEventListener('mouseup', handleEnd);
+
+       canvas.addEventListener('touchstart', e => handleStart(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
+       window.addEventListener('touchmove', e => {
+           e.preventDefault();
+           handleMove(e.touches[0].clientX, e.touches[0].clientY);
+       }, {passive: false});
+       window.addEventListener('touchend', handleEnd);
+
+
+       function resize() {
+           width = canvas.width = window.innerWidth;
+           height = canvas.height = window.innerHeight;
+           init();
+       }
+
+       function generateTreePoints() {
+           treeTargetPoints = [];
+           const centerX = width / 2;
+           const startY = height * 0.18;
+           const treeHeight = height * 0.58;
+           const endY = startY + treeHeight;
+
+           // Thân cây
+           for(let i = 0; i < 120; i++) {
+               treeTargetPoints.push({ x: centerX + (Math.random() - 0.5) * 50, y: endY + Math.random() * 60, color: '#8B4513' });
+           }
+           
+           // Tán lá
+           const levels = 1600;
+           for (let i = 0; i < levels; i++) {
+               const t = i / levels;
+               const y = startY + (t * treeHeight);
+               const spread = Math.pow(t, 0.8) * (treeHeight * 0.6);
+               const x = centerX + (Math.random() - 0.5) * spread * 2;
+               let color = '#2ecc71';
+               const r = Math.random();
+               if (r > 0.90) color = '#f1c40f'; else if (r > 0.96) color = '#e74c3c'; else if (r > 0.98) color = '#ffffff';
+               treeTargetPoints.push({ x, y, color });
+           }
+
+           // Ngôi sao
+           const starCenterX = centerX;
+           const starCenterY = startY - 50;
+           const outerRadius = 55;
+           const innerRadius = 22;
+           const points = 5;
+           
+           for (let i = 0; i < points * 2; i++) {
+               const angle = (Math.PI / points) * i - Math.PI / 2;
+               const radius = i % 2 === 0 ? outerRadius : innerRadius;
+               const targetX = starCenterX + Math.cos(angle) * radius;
+               const targetY = starCenterY + Math.sin(angle) * radius;
+
+               const particlesPerRay = 18;
+               for (let j = 0; j < particlesPerRay; j++) {
+                   const t = j / particlesPerRay;
+                   const x = starCenterX * (1-t) + targetX * t;
+                   const y = starCenterY * (1-t) + targetY * t;
+                   let color = t < 0.3 ? '#ffffff' : (t < 0.6 ? '#fffac2' : '#FFD700');
+                   treeTargetPoints.push({
+                       x: x + (Math.random() - 0.5) * 6,
+                       y: y + (Math.random() - 0.5) * 6,
+                       color: color,
+                       isStar: true
+                   });
+               }
+           }
+       }
+
+       class Particle {
+           constructor(target) {
+               this.targetX = target.x;
+               this.targetY = target.y;
+               this.color = target.color;
+               this.isStar = target.isStar || false;
+
+               this.x = Math.random() * width;
+               this.y = height + 20;
+               
+               this.baseSize = this.isStar ? Math.random() * 3 + 3 : Math.random() * 2 + 1;
+               this.size = this.baseSize;
+
+               this.ease = 0.02 + Math.random() * 0.02;
+               
+               // Mở rộng phạm vi nổ ra 1.5 lần màn hình để hạt bay "vút" qua màn hình nhanh hơn
+               this.explodeX = (Math.random() * width * 1.5) - (width * 0.25);
+               this.explodeY = (Math.random() * height * 1.5) - (height * 0.25);
+
+               if (this.isStar) {
+                   this.twinkleAngle = Math.random() * Math.PI * 2;
+                   this.twinkleSpeed = 0.03 + Math.random() * 0.05;
+               }
+           }
+
+           update() {
+               let destX, destY, currentEase;
+
+               if (mouse.isDown) {
+                   // --- BUNG LỤA TỐC ĐỘ CAO ---
+                   destX = this.explodeX;
+                   destY = this.explodeY;
+                   
+                   // Tăng tốc độ bay lên 0.2 (Rất nhanh)
+                   // Cộng thêm chút random để hạt bay không đều, nhìn tự nhiên hơn
+                   currentEase = 0.2 + Math.random() * 0.05;
+               } else {
+                   // --- HỘI TỤ VỀ CÂY ---
+                   destX = this.targetX;
+                   destY = this.targetY;
+                   currentEase = this.ease;
+               }
+
+               this.x += (destX - this.x) * currentEase;
+               this.y += (destY - this.y) * currentEase;
+
+               if (!mouse.isDown && Math.abs(destX - this.x) < 2) {
+                    this.x += (Math.random() - 0.5) * 0.8;
+                    this.y += (Math.random() - 0.5) * 0.8;
+               }
+
+               if (this.isStar) {
+                   this.twinkleAngle += this.twinkleSpeed;
+                   this.size = this.baseSize * (1 + Math.sin(this.twinkleAngle) * 0.3);
+               }
+           }
+
+           draw() {
+               ctx.beginPath();
+               ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+               ctx.fillStyle = this.color;
+               
+               if (mouse.isDown) {
+                    ctx.shadowBlur = 0; // Tắt blur khi bay nhanh để tối ưu hiệu năng và nét hơn
+               } else if (this.isStar) {
+                   ctx.shadowBlur = 35;
+                   ctx.shadowColor = '#FFD700';
+               } else {
+                   ctx.shadowBlur = 0;
+               }
+               
+               ctx.fill();
+               ctx.shadowBlur = 0;
+           }
+       }
+
+       function init() {
+           generateTreePoints();
+           particles = [];
+           treeTargetPoints.forEach(target => {
+               particles.push(new Particle(target));
+           });
+       }
+
+       function animate() {
+           // Khi bay nhanh, làm mờ background nhanh hơn (0.25) để đuôi hạt không bị dài ngoằng lộn xộn
+           ctx.fillStyle = mouse.isDown ? 'rgba(5, 5, 5, 0.25)' : 'rgba(5, 5, 5, 0.25)';
+           ctx.fillRect(0, 0, width, height);
+
+           particles.forEach(p => {
+               p.update();
+               p.draw();
+           });
+
+           requestAnimationFrame(animate);
+       }
+
+       window.addEventListener('resize', resize);
+       resize();
+       animate();
+
+   </script>
+
+   <script>
+       // Hiệu ứng tuyết rơi
+       const snowCanvas = document.createElement('canvas');
+       snowCanvas.style.position = 'fixed';
+       snowCanvas.style.top = '0';
+       snowCanvas.style.left = '0';
+       snowCanvas.style.width = '100%';
+       snowCanvas.style.height = '100%';
+       snowCanvas.style.pointerEvents = 'none';
+       snowCanvas.style.zIndex = '5';
+       document.body.appendChild(snowCanvas);
+
+       const snowCtx = snowCanvas.getContext('2d');
+       let snowflakes = [];
+
+       function resizeSnowCanvas() {
+           snowCanvas.width = window.innerWidth;
+           snowCanvas.height = window.innerHeight;
+       }
+
+       class Snowflake {
+           constructor() {
+               this.x = Math.random() * snowCanvas.width;
+               this.y = Math.random() * snowCanvas.height - snowCanvas.height;
+               this.radius = Math.random() * 3 + 1;
+               this.speed = Math.random() * 1 + 0.5;
+               this.drift = Math.random() * 0.5 - 0.25;
+               this.opacity = Math.random() * 0.6 + 0.4;
+           }
+
+           update() {
+               this.y += this.speed;
+               this.x += this.drift;
+
+               if (this.y > snowCanvas.height) {
+                   this.y = -10;
+                   this.x = Math.random() * snowCanvas.width;
+               }
+
+               if (this.x > snowCanvas.width) {
+                   this.x = 0;
+               } else if (this.x < 0) {
+                   this.x = snowCanvas.width;
+               }
+           }
+
+           draw() {
+               snowCtx.beginPath();
+               snowCtx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+               snowCtx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+               snowCtx.fill();
+           }
+       }
+
+       function initSnow() {
+           snowflakes = [];
+           const numberOfSnowflakes = Math.min(150, Math.floor(snowCanvas.width / 10));
+           for (let i = 0; i < numberOfSnowflakes; i++) {
+               snowflakes.push(new Snowflake());
+           }
+       }
+
+       function animateSnow() {
+           snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+
+           snowflakes.forEach(flake => {
+               flake.update();
+               flake.draw();
+           });
+
+           requestAnimationFrame(animateSnow);
+       }
+
+       window.addEventListener('resize', resizeSnowCanvas);
+       resizeSnowCanvas();
+       initSnow();
+       animateSnow();
+   </script>
+
+<script>
+    const fwCanvas = document.createElement('canvas');
+    fwCanvas.style.position = 'fixed';
+    fwCanvas.style.top = '0';
+    fwCanvas.style.left = '0';
+    fwCanvas.style.width = '100%';
+    fwCanvas.style.height = '100%';
+    fwCanvas.style.pointerEvents = 'none';
+    fwCanvas.style.zIndex = '1'; 
+    document.body.appendChild(fwCanvas);
+
+    const fwCtx = fwCanvas.getContext('2d');
+    let fwW = window.innerWidth;
+    let fwH = window.innerHeight;
+    fwCanvas.width = fwW;
+    fwCanvas.height = fwH;
+
+    let fireworks = [];
+    let sparks = [];
+    let isPaused = false;
+
+    // Lắng nghe sự kiện giữ chuột
+    window.addEventListener('mousedown', () => isPaused = true);
+    window.addEventListener('mouseup', () => isPaused = false);
+    window.addEventListener('touchstart', () => isPaused = true, {passive: true});
+    window.addEventListener('touchend', () => isPaused = false);
+
+    window.addEventListener('resize', () => {
+        fwW = fwCanvas.width = window.innerWidth;
+        fwH = fwCanvas.height = window.innerHeight;
+    });
+
+    class Firework {
+        constructor() {
+            this.x = Math.random() * fwW;
+            this.y = fwH;
+            // Bắn cao ngẫu nhiên, từ giữa màn hình lên đỉnh
+            this.targetY = Math.random() * (fwH * 0.5); 
+            this.speed = 8 + Math.random() * 5; // Bắn rất nhanh
+            this.angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.15;
+            this.vx = Math.cos(this.angle) * this.speed;
+            this.vy = Math.sin(this.angle) * this.speed;
+            // Random màu theo dải HSL để rực rỡ nhất
+            this.hue = Math.floor(Math.random() * 360);
+            this.dead = false;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += 0.12; // Trọng lực nặng hơn xíu để cảm giác bắn lên mạnh mẽ
+
+            if (this.vy >= 0 || this.y <= this.targetY) {
+                this.dead = true;
+                // Tạo hiệu ứng chớp sáng khi nổ (Flash)
+                createExplosionFlash(this.x, this.y, this.hue);
+                createSparks(this.x, this.y, this.hue);
+            }
+        }
+
+        draw() {
+            fwCtx.beginPath();
+            fwCtx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+            fwCtx.fillStyle = `hsl(${this.hue}, 100%, 50%)`;
+            fwCtx.fill();
+        }
+    }
+
+    class Spark {
+        constructor(x, y, hue) {
+            this.x = x;
+            this.y = y;
+            // Góc nổ 360 độ
+            const angle = Math.random() * Math.PI * 2;
+            // Tốc độ nổ cực mạnh (To hơn)
+            const speed = Math.random() * 12 + 2; 
+            // Thêm ma sát (friction) để tạo hiệu ứng "bung ra rồi lơ lửng"
+            this.friction = 0.94; 
+            this.gravity = 0.08 + Math.random() * 0.05; // Rơi tự nhiên
+            
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            
+            // Màu sắc biến thiên nhẹ xung quanh màu chủ đạo
+            this.hue = hue + (Math.random() - 0.5) * 40; 
+            this.brightness = Math.random() * 40 + 60; // Độ sáng cao (60-100%)
+            this.alpha = 1;
+            this.decay = Math.random() * 0.01 + 0.005; // Lâu tàn
+        }
+
+        update() {
+            this.vx *= this.friction; // Bị cản không khí chậm lại
+            this.vy *= this.friction;
+            
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += this.gravity; // Sau khi chậm lại thì bị kéo xuống
+            
+            this.alpha -= this.decay;
+        }
+
+        draw() {
+            fwCtx.save();
+            fwCtx.globalAlpha = this.alpha;
+            // Dùng HSL để màu cực tươi (Neon)
+            fwCtx.fillStyle = `hsl(${this.hue}, 100%, ${this.brightness}%)`;
+            fwCtx.beginPath();
+            fwCtx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+            fwCtx.fill();
+            fwCtx.restore();
+        }
+    }
+
+    // Hiệu ứng chớp sáng trắng (Flash) khi nổ
+    function createExplosionFlash(x, y, hue) {
+        fwCtx.save();
+        fwCtx.globalCompositeOperation = 'lighter';
+        const gradient = fwCtx.createRadialGradient(x, y, 0, x, y, 150);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(0.5, `hsla(${hue}, 100%, 50%, 0.4)`);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        fwCtx.fillStyle = gradient;
+        fwCtx.beginPath();
+        fwCtx.arc(x, y, 150, 0, Math.PI * 2);
+        fwCtx.fill();
+        fwCtx.restore();
+    }
+
+    function createSparks(x, y, hue) {
+        // Số lượng hạt cực lớn cho hoành tráng
+        const particleCount = 180; 
+        for (let i = 0; i < particleCount; i++) {
+            sparks.push(new Spark(x, y, hue));
+        }
+    }
+
+    function animateFireworks() {
+        requestAnimationFrame(animateFireworks);
+
+        if (isPaused) return;
+
+        // Trail (đuôi) dài hơn và mượt hơn
+        fwCtx.globalCompositeOperation = 'destination-out';
+        fwCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+        fwCtx.fillRect(0, 0, fwW, fwH);
+
+        // Chế độ hòa trộn Lighter là LINH HỒN của pháo hoa rực rỡ
+        fwCtx.globalCompositeOperation = 'lighter'; 
+
+        if (Math.random() < 0.05) { // Tốc độ bắn
+            fireworks.push(new Firework());
+        }
+
+        for (let i = fireworks.length - 1; i >= 0; i--) {
+            fireworks[i].update();
+            fireworks[i].draw();
+            if (fireworks[i].dead) fireworks.splice(i, 1);
+        }
+
+        for (let i = sparks.length - 1; i >= 0; i--) {
+            sparks[i].update();
+            sparks[i].draw();
+            if (sparks[i].alpha <= 0) sparks.splice(i, 1);
+        }
+    }
+
+    animateFireworks();
+</script>
+<style>
+    /* CSS cho khung ảnh */
+    #daica-photo-container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.8); /* Ban đầu nhỏ một chút */
+        z-index: 9999; /* Luôn nằm trên cùng */
+        opacity: 0; /* Mặc định ẩn */
+        pointer-events: none; /* Không chặn click chuột */
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Hiệu ứng hiện ra mượt mà */
+    }
+
+    #daica-photo-container img {
+        max-width: 80vw; /* Chiều ngang tối đa 80% màn hình */
+        max-height: 80vh; /* Chiều dọc tối đa 80% màn hình */
+        border-radius: 20px; /* Bo tròn góc */
+        border: 5px solid #FFD700; /* Viền vàng kim loại */
+        box-shadow: 0 0 50px rgba(255, 215, 0, 0.6), 0 0 100px rgba(255, 0, 0, 0.3); /* Hào quang tỏa sáng */
+        object-fit: cover;
+    }
+
+    /* Class kích hoạt hiển thị */
+    #daica-photo-container.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1); /* Phóng to về kích thước chuẩn */
+    }
+</style>
+
+<div id="daica-photo-container">
+    <img src="anh-dep.jpg" alt="Ảnh Đại Ca">
+</div>
+
+<script>
+    const photoContainer = document.getElementById('daica-photo-container');
+
+    function showPhoto() {
+        photoContainer.classList.add('show');
+    }
+
+    function hidePhoto() {
+        photoContainer.classList.remove('show');
+    }
+
+    // Lắng nghe sự kiện (Giữ chuột / Chạm tay)
+    window.addEventListener('mousedown', showPhoto);
+    window.addEventListener('mouseup', hidePhoto);
+    
+    // Hỗ trợ cảm ứng trên điện thoại
+    window.addEventListener('touchstart', showPhoto);
+    window.addEventListener('touchend', hidePhoto);
+</script>
+
+</body>
+</html>
